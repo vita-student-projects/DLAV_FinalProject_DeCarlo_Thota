@@ -150,6 +150,7 @@ Training automatically:
 - Saves the best model to 'best_model.pth'
 
 ## Inference for Submission
+Run the following script to generate the submission file for Kaggle:
 
 ```bash
 python infer.py --model best_model.pth --data data/test --out submission.csv
