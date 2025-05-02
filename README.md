@@ -4,11 +4,15 @@
 
 **Course**: Deep Learning for Autonomous Vehicles
 
+**Last Modification**: 02.05.2025
+
 **Milestone 1: End-to-End Planning**
+
+
 
 ---
 
-## Overview
+## Overview — Milestone 1
 
 This project implements an end-to-end deep learning model for the final project of the course DLAV at EPFL in 2025. It is use for predicting future vehicle trajectories using:
 
@@ -16,50 +20,48 @@ This project implements an end-to-end deep learning model for the final project 
 - Past motion history
 - Driving command (left/forward/right)
 
-It uses a GRU decoder with dynamic Laplace uncertainty modeling and scheduled sampling.
+It uses a GRU decoder with Laplace uncertainty modeling and scheduled sampling.
 
-## Model Development & Training Strategy — Milestone 1
+## Model & Training method
 
-To meet the target of ADE < 2.0 using only the allowed inputs (camera, driving command, ego motion history), we designed a compact but expressive end-to-end trajectory planning model.
+To get the ADE < 2.0 using only the inputs (camera, driving command, motion history), we designed an end-to-end trajectory planning model.
 
 ### Architecture Overview
 
-- **Visual Encoder**: A ResNet34 CNN backbone (pretrained on ImageNet) extracts semantic visual features from the RGB camera input.
-- **Motion History Encoder**: A lightweight Transformer processes the past 21 steps of ego vehicle motion (`x`, `y`, `heading`, velocity, acceleration) to encode temporal dynamics.
-- **Command Embedding**: High-level driving intent (`left`, `right`, `forward`) is embedded and fused with other features to guide prediction.
-- **Feature Fusion**: The outputs of the motion encoder, image encoder, and command embedding are concatenated and passed through a fusion layer.
+- **Visual Encoder**: A ResNet34 model (pretrained on ImageNet) extracts features from the RGB camera input.
+- **Motion History Encoder**: A lightweight Transformer processes the past 21 steps of vehicle motion (`x`, `y`, `heading`, velocity, acceleration) to encode temporal dynamics. The velocity and the acceleration are estimated by the motion of the 21 steps of the vehicle.
+- **Command Embedding**: Driving command (`left`, `right`, `forward`) is embedded and fused with other features to help prediction.
+- **Feature Fusion**: The outputs of the motion encoder, image encoder and command embedding are merged and passed through a fusion layer.
 - **GRU Decoder**: An autoregressive GRU predicts the future trajectory over 60 steps. At each step, the GRU receives the fused features and the last predicted point.
-- **Dynamic Laplace Modeling** *(Optional)*: In an enhanced version, the model predicts Laplace scale parameters (`log bₓ`, `log bᵧ`) per timestep, enabling uncertainty-aware loss modeling.
-- **Scheduled Sampling**: During training, the model gradually shifts from using ground-truth points to its own predictions to combat exposure bias.
+- **Scheduled Sampling**: During training, the model gradually relies less on using ground-truth points for its own predictions to combat exposure bias.
 
 ### Training Configuration
 
-- **Input Modalities**: RGB image, driving command, and ego motion history only
+- **Input data**: RGB image, driving command, and motion history only
 - **Trajectory Losses**:
   - **Laplace NLL loss** for spatial prediction
-  - **Heading MSE** to align orientation
-  - **Velocity & curvature losses** to encourage realism and smoothness
+  - **Heading MSE** to adjust orientation
+  - **Velocity & curvature losses** to avoid abnormal behaviour between steps.
 - **Optimization**:
   - Adam optimizer (`lr=1e-4`, `weight_decay=1e-5`)
   - Cosine annealing learning rate schedule
   - Gradient clipping (`max_norm=5.0`) for stability
-- **Data Augmentation**: Random affine transforms, color jittering, and resizing applied to images during training
+- **Data Augmentation**: Random affine transforms, color jittering, and resizing applied to images only during training
 
-### Results
+### Results for validation
 
 | Metric       | Value |
 |--------------|--------|
 | ADE (Validation) | ✅ **1.6** |
 | FDE (Validation) | ~5.4       |
-| Curved ADE       | ~1.8       |
 
-This approach met the ADE target for Milestone 1 using only the permitted input signals, demonstrating strong trajectory generation performance in both straight and curved scenarios.
+With this method we could get an ADE score < 2 and reach the task of Milestone 1 with the permitted input.
 
 ---
 
 ## Project Structure
 
-DLAV_P1/
+DLAV_Phase1/
 
 ├── models/
 
@@ -94,7 +96,7 @@ pip install -r requirements.txt
 ```
 
 ## Data 
-To download and extract the training, validation, and test datasets, run the following script:
+To download and extract the training, validation, and test datasets for the Milestone 1, run the following script:
 ```bash
 import gdown
 import zipfile
@@ -122,7 +124,19 @@ with zipfile.ZipFile(output_zip, 'r') as zip_ref:
 ```
 
 ## Training
-Train the planner model:
+Configuration to run the training:
+
+```bash
+# --- Configuration ---
+BATCH_SIZE = 32
+NUM_EPOCHS = 50
+LEARNING_RATE = 1e-4
+WEIGHT_DECAY = 1e-5
+EARLY_STOP_PATIENCE = 10
+SAVE_PATH = 'best_model.pth'
+```
+
+Run the following script to train the model:
 
 ```bash
 python train.py
@@ -133,9 +147,9 @@ Training automatically:
 - Logs ADE/FDE/Heading error
 - Applies scheduled sampling decay
 - Performs early stopping based on ADE
-- Saves the best model to best_model.pth
+- Saves the best model to 'best_model.pth'
 
-## Inference for Kaggle Submission
+## Inference for Submission
 
 ```bash
 python infer.py --model best_model.pth --data data/test --out submission.csv
