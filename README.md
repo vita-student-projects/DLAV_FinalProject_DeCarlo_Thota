@@ -52,8 +52,8 @@ To get the ADE < 2.0 using only the inputs (camera, driving command, motion hist
 
 | Metric       | Value |
 |--------------|--------|
-| ADE (Validation) | ✅ **1.6** |
-| FDE (Validation) | ~5.4       |
+| ADE (Validation) | ✅ **1.5** |
+| FDE (Validation) | ~4.18     	|
 
 With this method we could get an ADE score < 2 and reach the task of Milestone 1 with the permitted input.
 
@@ -61,30 +61,19 @@ With this method we could get an ADE score < 2 and reach the task of Milestone 1
 
 ## Project Structure
 
-DLAV_Phase1/
-
+DLAV_Phase2/
 ├── models/
-
 │   ├── planner.py
-
 │   ├── loss.py
-
 │   └── __init__.py
-
 ├── data/
-
 │   ├── dataset.py
-
 │   └── __init__.py
-
 ├── utils.py
-
 ├── train.py
-
+├── visualize_predictions.py
 ├── infer.py
-
 ├── requirements.txt
-
 ├── README.md
 
 ## Setup
