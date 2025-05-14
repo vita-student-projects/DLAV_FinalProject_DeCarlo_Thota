@@ -1,18 +1,18 @@
-# DLAV Phase 1 — End-to-End Trajectory Planner
+# DLAV Phase 2 — End-to-End Trajectory Planner
 
 **Author**: Giuseppe De Carlo and Sai Avinash Thota
 
 **Course**: Deep Learning for Autonomous Vehicles
 
-**Last Modification**: 02.05.2025
+**Last Modification**: 15.05.2025
 
-**Milestone 1: End-to-End Planning**
+**Milestone 2: Perception-Aware Planning**
 
 
 
 ---
 
-## Overview — Milestone 1
+## Overview — Milestone 2
 
 This project implements an end-to-end deep learning model for the final project of the course DLAV at EPFL in 2025. It is use for predicting future vehicle trajectories using:
 
@@ -60,7 +60,7 @@ With this method we could get an ADE score < 2 and reach the task of Milestone 1
 ---
 
 ## Project Structure
-
+```bash
 DLAV_Phase2/
 ├── models/
 │   ├── planner.py
@@ -75,7 +75,7 @@ DLAV_Phase2/
 ├── infer.py
 ├── requirements.txt
 ├── README.md
-
+```
 ## Setup
 
 Install all dependencies:
