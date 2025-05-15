@@ -35,122 +35,23 @@ To reach the tighter target of ADE < 1.60 we extend the Phase 1 planner with per
 
 ### Architecture Overview
 
-- **Visual Encoder**: A ResNet34 model (pretrained on ImageNet) extracts features from the RGB camera input.
-- **Motion History Encoder**: A lightweight Transformer processes the past 21 steps of vehicle motion (`x`, `y`, `heading`, velocity, acceleration) to encode temporal dynamics. The velocity and the acceleration are estimated by the motion of the 21 steps of the vehicle.
-- **Command Embedding**: Driving command (`left`, `right`, `forward`) is embedded and fused with other features to help prediction.
-- **Feature Fusion**: The outputs of the motion encoder, image encoder and command embedding are merged and passed through a fusion layer.
-- **GRU Decoder**: An autoregressive GRU predicts the future trajectory over 60 steps. At each step, the GRU receives the fused features and the last predicted point.
-- **Scheduled Sampling**: During training, the model gradually relies less on using ground-truth points for its own predictions to combat exposure bias.
-Architecture Overview
-This architecture is a multitask deep learning model that performs future trajectory prediction while leveraging perception-based auxiliary tasks (depth estimation, semantic segmentation, and object presence detection). It is trained end-to-end using RGB input images, motion history, and high-level driving commands.
-
-🔹 1. Visual Backbone (Dual ResNet Towers)
-Two ResNet-34 encoders are used:
-
-plan_encoder: extracts spatial features for planning.
-
-percep_encoder: feeds auxiliary heads for perception tasks.
-
-Both produce a feature map of shape (B, 512, 7, 7) from the input RGB image.
-
-🔹 2. Motion History Encoder (Transformer)
-A custom TransformerMotionEncoder processes ego vehicle history over 21 steps.
-
-Input: (B, 21, 11) → each step includes position, velocity, acceleration, timestep, ego flag.
-
-Output: a 128-dimensional feature, projected to match the planning hidden size.
-
-🔹 3. Command Embedding
-A learned embedding layer maps the categorical driving command (left, forward, right) to a 32-dimensional vector.
-
-🔹 4. Auxiliary Perception Heads
-These heads operate on the percep_encoder features:
-
-a. Depth Head
-A transposed convolutional decoder that upsamples ResNet features to predict a (1, 56, 56) depth map.
-
-b. Semantic Segmentation Head
-Similar to the depth head, this decoder outputs a (14, 56, 56) pixel-wise semantic label map over 14 classes.
-
-c. Affordance Heads
-A set of binary classifiers (1 per object type: car, truck, lane line, traffic light).
-
-Operate on global ResNet features to predict object presence scores in the scene.
-
-🔹 5. Semantic Mask Encoder (for Fusion)
-Ground truth object masks (e.g., car, lane line) are stacked and passed through a lightweight CNN.
-
-Output: a 128-dimensional scene representation summarizing spatial object presence.
-
-🔹 6. Feature Projection and Fusion
-The model conditionally fuses planning and auxiliary features based on the training phase:
-
-Always included:
-
-Flattened ResNet planning features → projected to 256.
-
-Transformer-based motion vector (256).
-
-Command embedding (32).
-
-Conditionally included (after epoch 65):
-
-Depth feature projection: AdaptiveAvgPool + Linear → (64,)
-
-Segmentation projection: AdaptiveAvgPool + Linear → (128,)
-
-Semantic mask encoding: CNN + FC → (128,)
-
-➡️ All vectors are concatenated → passed through a fusion MLP → final 256-dimensional planning vector.
-
-🔹 7. GRU-Based Trajectory Decoder
-A GRUCell autoregressively predicts the future trajectory over 60 timesteps.
-
-Input at each step: concatenation of the fused feature vector and the last predicted point (x, y, heading).
-
-Output: delta (Δx, Δy, Δθ) added to the previous output to predict the next point.
-
-➡️ Uses scheduled sampling to gradually replace ground truth with model predictions during training.
-
-🔹 8. Multitask Loss Function
-The total loss is a weighted combination of:
-
-Loss Type	Component	Description
-Planning	Laplace NLL	Main loss for position prediction
-Planning	Heading MSE	Aligns predicted vs. true heading
-Planning	Velocity MSE	Encourages correct motion dynamics
-Planning	Smoothness	Penalizes acceleration spikes
-Planning	Curvature	Penalizes sharp turns
-Perception	Depth L1	Pixel-wise depth prediction
-Perception	Semantic CE	Per-pixel segmentation accuracy
-Affordance	Object BCE	Presence prediction for 4 object types
-Perception	Lane Line BCE	Binary classification for lane mask
-
-🔹 9. Dynamic Loss Weighting (DWA)
-A custom DWAWeightBalancer adjusts loss weights dynamically across epochs.
-
-It adapts to task difficulty by tracking recent loss history and computing a softmax-like score for each task.
-
-This ensures balanced learning across trajectory and perception tasks.
-
-🔹 10. Optimizer & Training Strategy
-Optimizer: Adam (lr=1e-4, weight decay=1e-5)
-
-Scheduler: CosineAnnealingWarmRestarts
-
-Gradient Clipping: norm capped at 5.0
-
-Training Phases:
-
-Epoch 0–24: trajectory loss only
-
-Epoch 25–44: trajectory + depth + segmentation
-
-Epoch 45+: full fusion + lane loss + affordance loss
+**Visual Backbone (Dual ResNet Towers)**: Two ResNet-34 models extract features from the RGB input — one feeds the planning branch (`plan_encoder`), and the other powers auxiliary perception heads (`percep_encoder`).
+**Motion History Encoder**: A lightweight Transformer encodes the last 21 steps of ego motion, including estimated velocity and acceleration, outputting a temporal representation.
+**Command Embedding**: Categorical driving intent is embedded into a 32D vector to guide planning decisions.
+**Auxiliary Perception Heads**:
+  - **Depth Decoder**: Upsamples ResNet features into a (1, 56, 56) dense depth map.
+  - **Semantic Segmentation Decoder**: Predicts (14, 56, 56) segmentation masks.
+  - **Affordance Heads**: Binary classifiers predict the presence of objects like cars, lane lines, traffic lights, and trucks.
+**Semantic Mask Encoder**: Processes GT binary masks for 4 semantic categories and encodes them into a compact 128D vector.
+**Feature Fusion**: The planning feature, motion embedding, command embedding, and (optionally) auxiliary features are concatenated and passed through a fusion MLP.
+**GRU Decoder**: An autoregressive GRU predicts the 60-step trajectory by recursively applying delta prediction to the previous output.
+**Scheduled Sampling**: Ground truth is gradually replaced with model predictions to improve stability.
+**Multitask Loss**: Combines Laplace NLL, heading, velocity, curvature, depth (L1), segmentation (CE), affordance (BCE), and lane (BCE).
+**Dynamic Loss Weighting (DWA)**: Learns task weights automatically across training epochs based on recent loss trends.
 
 ### Training Configuration
 
-- **Input data**: RGB image, driving command, and motion history only
+- **Input data**: RGB image, driving command, motion history.
 - **Trajectory Losses**:
   - **Laplace NLL loss** for spatial prediction
   - **Heading MSE** to adjust orientation
@@ -168,7 +69,7 @@ Epoch 45+: full fusion + lane loss + affordance loss
 | ADE (Validation) | ✅ **1.5** |
 | FDE (Validation) | ~4.18     	|
 
-With this method we could get an ADE score < 2 and reach the task of Milestone 1 with the permitted input.
+With this method we could get an ADE score < 1.6 and reach the task of Milestone 2 with the permitted input.
 
 ---
 
