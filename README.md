@@ -41,6 +41,112 @@ To reach the tighter target of ADE < 1.60 we extend the Phase 1 planner with per
 - **Feature Fusion**: The outputs of the motion encoder, image encoder and command embedding are merged and passed through a fusion layer.
 - **GRU Decoder**: An autoregressive GRU predicts the future trajectory over 60 steps. At each step, the GRU receives the fused features and the last predicted point.
 - **Scheduled Sampling**: During training, the model gradually relies less on using ground-truth points for its own predictions to combat exposure bias.
+Architecture Overview
+This architecture is a multitask deep learning model that performs future trajectory prediction while leveraging perception-based auxiliary tasks (depth estimation, semantic segmentation, and object presence detection). It is trained end-to-end using RGB input images, motion history, and high-level driving commands.
+
+🔹 1. Visual Backbone (Dual ResNet Towers)
+Two ResNet-34 encoders are used:
+
+plan_encoder: extracts spatial features for planning.
+
+percep_encoder: feeds auxiliary heads for perception tasks.
+
+Both produce a feature map of shape (B, 512, 7, 7) from the input RGB image.
+
+🔹 2. Motion History Encoder (Transformer)
+A custom TransformerMotionEncoder processes ego vehicle history over 21 steps.
+
+Input: (B, 21, 11) → each step includes position, velocity, acceleration, timestep, ego flag.
+
+Output: a 128-dimensional feature, projected to match the planning hidden size.
+
+🔹 3. Command Embedding
+A learned embedding layer maps the categorical driving command (left, forward, right) to a 32-dimensional vector.
+
+🔹 4. Auxiliary Perception Heads
+These heads operate on the percep_encoder features:
+
+a. Depth Head
+A transposed convolutional decoder that upsamples ResNet features to predict a (1, 56, 56) depth map.
+
+b. Semantic Segmentation Head
+Similar to the depth head, this decoder outputs a (14, 56, 56) pixel-wise semantic label map over 14 classes.
+
+c. Affordance Heads
+A set of binary classifiers (1 per object type: car, truck, lane line, traffic light).
+
+Operate on global ResNet features to predict object presence scores in the scene.
+
+🔹 5. Semantic Mask Encoder (for Fusion)
+Ground truth object masks (e.g., car, lane line) are stacked and passed through a lightweight CNN.
+
+Output: a 128-dimensional scene representation summarizing spatial object presence.
+
+🔹 6. Feature Projection and Fusion
+The model conditionally fuses planning and auxiliary features based on the training phase:
+
+Always included:
+
+Flattened ResNet planning features → projected to 256.
+
+Transformer-based motion vector (256).
+
+Command embedding (32).
+
+Conditionally included (after epoch 65):
+
+Depth feature projection: AdaptiveAvgPool + Linear → (64,)
+
+Segmentation projection: AdaptiveAvgPool + Linear → (128,)
+
+Semantic mask encoding: CNN + FC → (128,)
+
+➡️ All vectors are concatenated → passed through a fusion MLP → final 256-dimensional planning vector.
+
+🔹 7. GRU-Based Trajectory Decoder
+A GRUCell autoregressively predicts the future trajectory over 60 timesteps.
+
+Input at each step: concatenation of the fused feature vector and the last predicted point (x, y, heading).
+
+Output: delta (Δx, Δy, Δθ) added to the previous output to predict the next point.
+
+➡️ Uses scheduled sampling to gradually replace ground truth with model predictions during training.
+
+🔹 8. Multitask Loss Function
+The total loss is a weighted combination of:
+
+Loss Type	Component	Description
+Planning	Laplace NLL	Main loss for position prediction
+Planning	Heading MSE	Aligns predicted vs. true heading
+Planning	Velocity MSE	Encourages correct motion dynamics
+Planning	Smoothness	Penalizes acceleration spikes
+Planning	Curvature	Penalizes sharp turns
+Perception	Depth L1	Pixel-wise depth prediction
+Perception	Semantic CE	Per-pixel segmentation accuracy
+Affordance	Object BCE	Presence prediction for 4 object types
+Perception	Lane Line BCE	Binary classification for lane mask
+
+🔹 9. Dynamic Loss Weighting (DWA)
+A custom DWAWeightBalancer adjusts loss weights dynamically across epochs.
+
+It adapts to task difficulty by tracking recent loss history and computing a softmax-like score for each task.
+
+This ensures balanced learning across trajectory and perception tasks.
+
+🔹 10. Optimizer & Training Strategy
+Optimizer: Adam (lr=1e-4, weight decay=1e-5)
+
+Scheduler: CosineAnnealingWarmRestarts
+
+Gradient Clipping: norm capped at 5.0
+
+Training Phases:
+
+Epoch 0–24: trajectory loss only
+
+Epoch 25–44: trajectory + depth + segmentation
+
+Epoch 45+: full fusion + lane loss + affordance loss
 
 ### Training Configuration
 
