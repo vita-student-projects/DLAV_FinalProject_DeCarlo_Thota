@@ -1,5 +1,4 @@
-# DLAV Phase 2 — End-to-End Trajectory Planner
-
+# DLAV Phase 2 — Perception Aware- Planning
 **Author**: Giuseppe De Carlo and Sai Avinash Thota
 
 **Course**: Deep Learning for Autonomous Vehicles
@@ -14,17 +13,25 @@
 
 ## Overview — Milestone 2
 
-This project implements an end-to-end deep learning model for the final project of the course DLAV at EPFL in 2025. It is use for predicting future vehicle trajectories using:
+This project implements an Perception Aware deep learning model for the final project of the course DLAV at EPFL in 2025. It is use for predicting future vehicle trajectories.
+This phase upgrades the Phase-1 end-to-end trajectory planner by training to perceive the depth.
+During training the network no longer learns only “where to drive next”, but simultaneously learns how far every pixel in the camera image is.
+Adding this auxiliary perception task enriches the visual features, regularises the encoder, and pushes the validation ADE below the 1.60 m target.
 
 - RGB camera input
 - Past motion history
 - Driving command (left/forward/right)
+- Auxiliary Depth Decoder – three up-convolution layers that reconstruct a 56 × 56 dense depth map from the shared visual features.
+- Multi-task Training – the model is supervised by a weighted sum of
+- Laplace NLL for future (x,y) coordinates
+- Heading & smoothness losses (as in Phase 1)
+- L1 depth loss for the predicted map (weight λ tuned with Dynamic-Weight-Averaging).
 
 It uses a GRU decoder with Laplace uncertainty modeling and scheduled sampling.
 
 ## Model & Training method
 
-To get the ADE < 2.0 using only the inputs (camera, driving command, motion history), we designed an end-to-end trajectory planning model.
+To reach the tighter target of ADE < 1.60 we extend the Phase 1 planner with perception-aware auxiliary tasks. The resulting model, CASPStylePlanner, is a multi-task network that still predicts a 60-step future trajectory but is now jointly supervised to estimate depth, semantic segmentation, and the presence of critical affordances (cars, lane lines, traffic-lights, trucks). These extra signals shape the latent representation and act as a powerful self-regulariser during training.
 
 ### Architecture Overview
 
