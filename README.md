@@ -1,4 +1,4 @@
-# DLAV Phase 2 — Perception Aware- Planning
+# DLAV Phase 2 — Perception Aware-Planning
 **Author**: Giuseppe De Carlo and Sai Avinash Thota
 
 **Course**: Deep Learning for Autonomous Vehicles
