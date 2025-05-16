@@ -29,11 +29,11 @@ Adding this auxiliary perception task enriches the visual features, regularises 
 
 It uses a GRU decoder with Laplace uncertainty modeling and scheduled sampling.
 
-## Model & Training method
+## Model & training method
 
 To reach the tighter target of ADE < 1.60 we extend the Phase 1 planner with perception-aware auxiliary tasks. The resulting model, CASPStylePlanner, is a multi-task network that still predicts a 60-step future trajectory but is now jointly supervised to estimate depth, semantic segmentation, and the presence of critical affordances (cars, lane lines, traffic-lights, trucks). These extra signals shape the latent representation and act as a powerful self-regulariser during training.
 
-### Architecture Overview
+### Architecture overview
 
 - **Visual Backbone (Dual ResNet Towers)**: Two ResNet-34 models extract features from the RGB input — one feeds the planning branch (`plan_encoder`), and the other powers auxiliary perception heads (`percep_encoder`).
 - **Motion History Encoder**: A lightweight Transformer encodes the last 21 steps of ego motion, including estimated velocity and acceleration, outputting a temporal representation.
@@ -49,9 +49,9 @@ To reach the tighter target of ADE < 1.60 we extend the Phase 1 planner with per
 - **Multitask Loss**: Combines Laplace NLL, heading, velocity, curvature, depth (L1), segmentation (CE), affordance (BCE), and lane (BCE).
 - **Dynamic Loss Weighting (DWA)**: Learns task weights automatically across training epochs based on recent loss trends.
 
-### Training Configuration
+### Training configuration
 
-- **Input data**: RGB image, driving command, motion history.
+- **Input data**: RGB image, driving command, motion history, depth amd semantic label .
 - **Trajectory Losses**:
   - **Laplace NLL loss** for spatial prediction
   - **Heading MSE** to adjust orientation
@@ -60,7 +60,14 @@ To reach the tighter target of ADE < 1.60 we extend the Phase 1 planner with per
   - Adam optimizer (`lr=1e-4`, `weight_decay=1e-5`)
   - Cosine annealing learning rate schedule
   - Gradient clipping (`max_norm=5.0`) for stability
-- **Data Augmentation**: Random affine transforms, color jittering, and resizing applied to images only during training
+- **Data Augmentation**: Random affine transforms, color jittering, and resizing applied to images only during training.
+
+- **Growing auxiliary supervision**:
+	- Epochs 0 to 24: Loss depending only on the trajectory (Laplace NLL).
+	- Epochs 25 to 44: Add depth and semantic segmentation losses.
+	- Epochs 45+: Add binary presence classification for important objects (cars, trucks, traffic lights, lanes) and a lane-line segmentation.
+
+
 
 ### Results for validation
 
@@ -127,15 +134,18 @@ with zipfile.ZipFile(output_zip, 'r') as zip_ref:
 ```
 
 ## Training
+
+To train the our model for this second milestone, first set the below configuration inside "train.py" or directly execute with our values. The training is composed of dynamic loss weighting, scheduled sampling and auxiliary perception tasks introduced progressively.
+
 Configuration to run the training:
 
 ```bash
 # --- Configuration ---
-BATCH_SIZE = 32
-NUM_EPOCHS = 50
+BATCH_SIZE = 16
+NUM_EPOCHS = 200
 LEARNING_RATE = 1e-4
 WEIGHT_DECAY = 1e-5
-EARLY_STOP_PATIENCE = 10
+EARLY_STOP_PATIENCE = 25
 SAVE_PATH = 'best_model.pth'
 ```
 
@@ -152,7 +162,22 @@ Training automatically:
 - Performs early stopping based on ADE
 - Saves the best model to 'best_model.pth'
 
-## Inference for Submission
+## Model prediction visualisation
+
+Once the training is done and we have saved our "best_model.pth", we can use the following python script to run a visualisation on how our model works on the validation dataset. You can observe:
+
+- RGB input images
+- Past inputs and predicted against future trajectories
+- Ground truth against predicted depth
+- Semantic segmentation maps
+
+Launch the visualisation:
+
+```bash
+python visualize_predictions.py
+```
+
+## Inference for submission
 Run the following script to generate the submission file for Kaggle:
 
 ```bash

@@ -183,13 +183,13 @@ def train(model, train_loader, val_loader, optimizer, scheduler, num_epochs=100,
         scheduler.step(avg_ade)
 
         print(f"[Epoch {epoch+1}] ADE: {avg_ade:.4f} | FDE: {avg_fde:.4f}")
-        print(f"🔁 λ weights — plan: {λ_plan:.3f}, depth: {λ_depth:.3f}, seg: {λ_seg:.3f}")
+        print(f"λ weights — plan: {λ_plan:.3f}, depth: {λ_depth:.3f}, seg: {λ_seg:.3f}")
 
         if avg_ade < best_ade:
             best_ade = avg_ade
             patience = 0
             torch.save(model.state_dict(), save_path)
-            print(f"✅ New best model saved (ADE: {best_ade:.4f})")
+            print(f"New best model saved (ADE: {best_ade:.4f})")
         else:
             patience += 1
             if patience >= early_stop_patience:
@@ -197,6 +197,15 @@ def train(model, train_loader, val_loader, optimizer, scheduler, num_epochs=100,
                 break
 
 if __name__ == "__main__":
+
+    # --- Configuration ---
+    BATCH_SIZE = 16
+    NUM_EPOCHS = 200
+    LEARNING_RATE = 1e-4
+    WEIGHT_DECAY = 1e-5
+    EARLY_STOP_PATIENCE = 25
+    SAVE_PATH = 'best_model.pth'
+
 
     train_data_dir = "train"  # Directory containing training data (Change as needed)
     val_data_dir = "val"      # Directory containing validation data (Change as needed)
@@ -216,12 +225,12 @@ if __name__ == "__main__":
     train_dataset = DrivingDataset(train_files, augment=True, test=False)
     val_dataset = DrivingDataset(val_files, augment=False, test=False)
 
-    train_loader = DataLoader(train_dataset, batch_size=16, num_workers=2, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=16, num_workers=2)
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, num_workers=2, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, num_workers=2)
 
     # Model, optimizer, scheduler
     model = CASPStylePlanner()
-    optimizer = optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=15, T_mult=1)
 
     # Train
@@ -231,6 +240,6 @@ if __name__ == "__main__":
         val_loader=val_loader,
         optimizer=optimizer,
         scheduler=scheduler,
-        num_epochs=200,
-        save_path='best_model.pt'
+        num_epochs=NUM_EPOCHS,
+        save_path=SAVE_PATH
     )
