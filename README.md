@@ -183,3 +183,11 @@ Run the following script to generate the submission file for Kaggle:
 ```bash
 python infer.py --model best_model.pth --data data/test --out submission.csv
 ```
+
+# References
+
+[1] Y. Hu et al., "UniAD: Planning-Oriented Autonomous Driving," *arXiv preprint arXiv:2212.10156*, 2023. [PDF](documents/2212.10156v2.pdf)
+
+[2] L. Chen et al., "End-to-End Autonomous Driving: Challenges and Frontiers," *arXiv:2306.16927*, 2024. [PDF](documents/2306.16927v3.pdf)
+
+[3] H. Yadav et al., "CASPFormer: Trajectory Prediction from BEV Images with Deformable Attention," *arXiv:2409.17790*, 2024. [PDF](documents/2409.17790v1.pdf)
