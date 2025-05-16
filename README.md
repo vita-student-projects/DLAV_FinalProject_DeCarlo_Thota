@@ -135,7 +135,7 @@ with zipfile.ZipFile(output_zip, 'r') as zip_ref:
 
 ## Training
 
-To train the our model for this second milestone, first set the below configuration inside "train.py" or directly execute with our values. The training is composed of dynamic loss weighting, scheduled sampling and auxiliary perception tasks introduced progressively.
+To train our model for this second milestone, first set the below configuration inside `train.py` or directly execute with the default values provided. The training is composed of dynamic loss weighting, scheduled sampling and auxiliary perception tasks introduced progressively.
 
 Configuration to run the training:
 
@@ -164,7 +164,7 @@ Training automatically:
 
 ## Model prediction visualisation
 
-Once the training is done and we have saved our "best_model.pth", we can use the following python script to run a visualisation on how our model works on the validation dataset. You can observe:
+Once the training is done and we have saved our `best_model.pth`, you can use the following Python script to visualize how the model performs on the validation dataset. You can observe:
 
 - RGB input images
 - Past inputs and predicted against future trajectories
