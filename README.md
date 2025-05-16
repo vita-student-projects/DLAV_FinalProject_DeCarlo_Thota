@@ -3,10 +3,9 @@
 
 **Course**: Deep Learning for Autonomous Vehicles
 
-**Last Modification**: 15.05.2025
+**Last Modification**: 16.05.2025
 
 **Milestone 2: Perception-Aware Planning**
-
 
 
 ---
