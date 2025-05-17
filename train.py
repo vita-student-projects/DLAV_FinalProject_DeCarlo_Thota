@@ -11,7 +11,6 @@ from utils import get_curved_mask
 
 from models.planner import CASPStylePlanner
 from data.dataset import DrivingDataset
-from train import train
 
 def train(model, train_loader, val_loader, optimizer, scheduler, num_epochs=100,
           save_path='best_model.pt', early_stop_patience=20):
