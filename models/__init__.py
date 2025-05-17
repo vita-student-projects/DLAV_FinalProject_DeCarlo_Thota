@@ -1,2 +1,2 @@
 from .planner import CASPStylePlanner
-from .loss import PlanningDynamicLaplaceLoss, DWAWeightBalancer
+from .loss import PlanningLaplaceLossSequential, DWAWeightBalancer
