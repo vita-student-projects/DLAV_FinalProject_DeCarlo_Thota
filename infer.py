@@ -7,80 +7,55 @@ from torch.utils.data import DataLoader
 from models import CASPStylePlanner
 from data import DrivingDataset
 
+if __name__ == "__main__":
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def load_file_list(folder):
-    import glob
-    return sorted(glob.glob(os.path.join(folder, "*.pkl")))
+    # === Load test data ===
+    test_data_dir = "test_public_real"
+    test_files = sorted(
+        [os.path.join(test_data_dir, fn) for fn in os.listdir(test_data_dir) if fn.endswith(".pkl")],
+        key=lambda fn: int(os.path.splitext(os.path.basename(fn))[0])
+    )
+    test_dataset = DrivingDataset(test_files, test=True)
+    test_loader = DataLoader(test_dataset, batch_size=250, num_workers=2)
 
-
-def run_inference(model_path, test_folder, output_csv, batch_size=32):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    # === Load model ===
+    # === Load Model ===
     model = CASPStylePlanner()
-    model.load_state_dict(torch.load(model_path, map_location=device))
+    model.load_state_dict(torch.load('best_model.pth'))
     model.to(device)
     model.eval()
 
-    # === Load dataset ===
-    test_files = load_file_list(test_folder)
-    test_dataset = DrivingDataset(test_files, test=True)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
-
-    all_results = []
+    all_plans = []
 
     with torch.no_grad():
-        for batch_idx, batch in enumerate(tqdm(test_loader, desc="🚀 Running Inference")):
-            camera = batch["camera"].to(device)
-            history = batch["history"].to(device)
-            command = batch["command"].to(device)
+        for batch in tqdm(test_loader, desc="Running Inference"):
+            camera = batch['camera'].to(device)
+            history = batch['history'].to(device)
 
-            if "depth" in batch and "semantic_mask" in batch:
-                depth = batch["depth"].to(device)
-                semantic_mask = batch["semantic_mask"].to(device)
-                traj_pred = model(
-                    camera=camera,
-                    history=history,
-                    command=command,
-                    depth=depth,
-                    semantic_mask=semantic_mask,
-                    return_aux=False,
-                    force_aux=True
-                )
-            else:
-                traj_pred = model(
-                    camera=camera,
-                    history=history,
-                    command=command,
-                    return_aux=False,
-                    force_aux=False
-                )
+            traj_pred = model(camera, history, command=None)
+            all_plans.append(traj_pred.cpu().numpy()[..., :2])  # x, y only
 
-            pred_xy = traj_pred[..., :2].cpu().numpy()
+    # === Flatten Results ===
+    all_plans = np.concatenate(all_plans, axis=0)  # (N, T, 2)
+    total_samples, T, D = all_plans.shape
+    pred_xy_flat = all_plans.reshape(total_samples, T * D)
 
-            # === Format CSV row-by-row
-            for i in range(pred_xy.shape[0]):
-                sample_id = os.path.basename(test_files[batch_idx * batch_size + i]).replace(".pkl", "")
-                for t in range(pred_xy.shape[1]):
-                    all_results.append({
-                        "id": f"{sample_id}_{t}",
-                        "x": pred_xy[i, t, 0],
-                        "y": pred_xy[i, t, 1],
-                    })
+    # === Save CSV ===
+    ids = np.arange(total_samples)
+    df_xy = pd.DataFrame(pred_xy_flat)
+    df_xy.insert(0, "id", ids)
 
-    df = pd.DataFrame(all_results)
-    df.to_csv(output_csv, index=False)
-    print(f"Saved predictions to {output_csv} | Total: {len(df)} rows")
+    col_names = ["id"] + [f"{coord}_{t}" for t in range(1, T+1) for coord in ['x', 'y']]
+    df_xy.columns = col_names
 
+    df_xy.to_csv("submission_p3.csv", index=False)
+    print(f"CSV saved! Shape: {df_xy.shape}")
 
-if __name__ == "__main__":
-    import argparse
+    # === Sanity Check ===
+    x_cols = [c for c in df_xy.columns if c.startswith("x_")]
+    y_cols = [c for c in df_xy.columns if c.startswith("y_")]
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, default="best_model.pt", help="Path to trained model")
-    parser.add_argument("--data", type=str, default="test_public", help="Path to test .pkl folder")
-    parser.add_argument("--out", type=str, default="submission_phase2.csv", help="Output CSV file")
-    parser.add_argument("--batch_size", type=int, default=32)
-    args = parser.parse_args()
+    max_x, min_x = df_xy[x_cols].max().max(), df_xy[x_cols].min().min()
+    max_y, min_y = df_xy[y_cols].max().max(), df_xy[y_cols].min().min()
 
-    run_inference(args.model, args.data, args.out, args.batch_size)
+    print(f" X: [{min_x:.2f}, {max_x:.2f}] | Y: [{min_y:.2f}, {max_y:.2f}]")
