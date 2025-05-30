@@ -6,6 +6,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, ConcatDataset
 from tqdm import tqdm
 import numpy as np
+import matplotlib.pyplot as plt
 
 from models import CASPStylePlanner, PlanningDynamicLaplaceLoss
 from data import DrivingDataset
@@ -17,8 +18,8 @@ if __name__ == "__main__":
     # --- Configuration ---
     BATCH_SIZE = 32
     NUM_EPOCHS = 250
-    LEARNING_RATE = 9e-4
-    WEIGHT_DECAY = 1e-5
+    LEARNING_RATE = 1e-3
+    WEIGHT_DECAY = 1e-4
     EARLY_STOP_PATIENCE = 50
     SAVE_PATH = 'best_model.pth'
 
@@ -31,9 +32,9 @@ if __name__ == "__main__":
     val_files   = load_file_list("val_real")     # update if needed
 
     # Datasets
-    train_sim = DrivingDataset(train_files, test=False)
-    train_real = DrivingDataset(val_files[:500], test=False)
-    val_dataset = DrivingDataset(val_files[500:], test=False)
+    train_sim = DrivingDataset(train_files, is_real=False, test=False)
+    train_real = DrivingDataset(val_files[:500], is_real=True, test=False)
+    val_dataset = DrivingDataset(val_files[500:], is_real=True, test=False, validate=True)
 
     train_dataset = ConcatDataset([train_sim, train_real])
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
@@ -50,6 +51,7 @@ if __name__ == "__main__":
     # --- Training Loop ---
     best_ade = float('inf')
     patience = 0
+    total_train_losses = []
 
     for epoch in range(NUM_EPOCHS):
         model.train()
@@ -62,7 +64,7 @@ if __name__ == "__main__":
             future = batch["future"].to(device)
 
             optimizer.zero_grad()
-            decode_len = min(60, 85 + epoch * 2)
+            decode_len = min(60, 40 + epoch * 2)
 
             pred = model(camera, history, gt_future=future, decode_len=decode_len)
             loss, loss_dict = loss_fn(pred, future[:, :decode_len])
@@ -74,7 +76,10 @@ if __name__ == "__main__":
             pbar.set_postfix({k: f"{v.item():.3f}" for k, v in loss_dict.items()})
             train_losses.append(loss.item())
 
-        model.scheduled_sampling_prob = max(0.05, model.scheduled_sampling_prob * 0.6)
+        avg_train_loss = np.mean(train_losses)
+        total_train_losses.append(avg_train_loss)
+        print(f"[Epoch {epoch+1}] Avg Training Loss: {avg_train_loss:.4f}")
+        model.scheduled_sampling_prob = max(0.03, model.scheduled_sampling_prob * 0.8)
 
         # --- Validation ---
         model.eval()
@@ -85,7 +90,7 @@ if __name__ == "__main__":
                 camera = batch["camera"].to(device)
                 history = batch["history"].to(device)
                 future = batch["future"].to(device)
-                
+
 
                 pred = model(camera, history)
 
@@ -125,4 +130,23 @@ if __name__ == "__main__":
             patience += 1
             if patience >= EARLY_STOP_PATIENCE:
                 print("Early stopping.")
+                plt.figure()
+                plt.plot(total_train_losses, label="Training Loss")
+                plt.xlabel("Epoch")
+                plt.ylabel("Loss")
+                plt.title("Training Loss Curve")
+                plt.legend()
+                plt.grid(True)
+                plt.savefig("loss_curve.png")
+                print("Saved loss plot to loss_curve.png")
                 break
+
+    plt.figure()
+    plt.plot(total_train_losses, label="Training Loss")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.title("Training Loss Curve")
+    plt.legend()
+    plt.grid(True)
+    plt.savefig("loss_curve.png")
+    print("Saved loss plot to loss_curve.png")
