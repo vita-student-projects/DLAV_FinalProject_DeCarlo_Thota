@@ -18,7 +18,7 @@ class TransformerMotionEncoder(nn.Module):
         x = self.pool(x).squeeze(2)
         return x
 
-class MotionEncoderCNNGRU(nn.Module):
+class MotionEncoder(nn.Module):
     def __init__(self, input_dim=11, hidden_dim=128):
         super().__init__()
         self.cnn = nn.Sequential(
@@ -105,7 +105,7 @@ class CASPStylePlanner(nn.Module):
 
         self.image_encoder = RegionalVisionEncoder(out_dim=hidden_dim)
 
-        self.history_encoder = MotionEncoderCNNGRU(input_dim=3, hidden_dim=128)
+        self.history_encoder = MotionEncoder(input_dim=3, hidden_dim=128)
         self.motion_proj = nn.Linear(128, hidden_dim)
 
         self.mode_embedding = nn.Embedding(mode_num, 32)
