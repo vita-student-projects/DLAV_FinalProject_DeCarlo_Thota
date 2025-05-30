@@ -105,7 +105,7 @@ pip install -r requirements.txt
 ```
 
 ## Data 
-To download and extract the training, validation, and test datasets for the Milestone 1, run the following script:
+To download and extract the training, validation, and test datasets for the Milestone 2, run the following script:
 ```bash
 import gdown
 import zipfile
