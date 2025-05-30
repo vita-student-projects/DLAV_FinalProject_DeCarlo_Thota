@@ -3,7 +3,7 @@
 
 **Course**: Deep Learning for Autonomous Vehicles
 
-**Last Modification**: 29.05.2025
+**Last Modification**: 30.05.2025
 
 **Milestone 3: Sim-to-Real Generalization**
 
@@ -15,13 +15,6 @@
 This project implements an Perception Aware deep learning model for the final project of the course DLAV at EPFL in 2025. It is use for predicting future vehicle trajectories.
 This phase upgrades the Phase-1 and Phase-2 end-to-end trajectory planner by training to perceive the real scenario.
 This repository implements an **end-to-end trajectory planner** designed to generalize from simulation to real-world driving scenarios. Built on top of our Milestone 1 architecture, it focuses on **robust spatial-temporal encoding**, **domain-augmented training**, and **scheduled sampling** to deliver low ADE performance in real-world scenes.
-
-- **ResNet-34 Visual Backbone** (frozen layers 1–3)
-- **GRU-based Decoder** with autoregressive delta prediction
-- **Motion History Encoder** (via MLP or GRU)
-- **Scheduled Sampling** to improve generalization
-- **Sim2Real Data Augmentation** using color jitter, affine transform, blur
-- **Weighted Multiterm Loss** including velocity, heading, smoothness & curvature
 
 It uses a GRU decoder with Laplace uncertainty modeling and scheduled sampling.
 
@@ -37,7 +30,7 @@ It uses a GRU decoder with Laplace uncertainty modeling and scheduled sampling.
 
 ## Model & training method
 
-To reach the tighter target of ADE < 1.80 we extend the Phase 1 planner with perception-aware auxiliary tasks. The resulting model, CASPStylePlanner, is a multi-task network that still predicts a 60-step future trajectory but is now jointly supervised to estimate depth, semantic segmentation, and the presence of critical affordances (cars, lane lines, traffic-lights, trucks). These extra signals shape the latent representation and act as a powerful self-regulariser during training.
+To reach the tighter target of ADE < 1.80 in real world driving, we extend the Phase 1 planner. The resulting model, CASPStylePlanner, is a multi-task network that still predicts a 60-step future trajectory but is now jointly supervised to a regional vision encoder working on ResNet34 with a motion history CNN encoder and a GRU decoder with scheduled sampling. These components together enable better generalization from simulation to real-world scenarios.
 
 ### Architecture overview
 
@@ -58,20 +51,20 @@ Defined in `loss.py`, it includes:
 - **Curvature Loss**: Controls turning rate variations
 
 ### Domain Adaptation
-To adapt simulated training to real world testing, we apply the following domain adaptation in `dataset.py`:
-- **ColorJitter**
-- **GaussianBlur**
-- **RandomAffine**
-- **Perspective transform**
-- **Random Erasing**
-  
-These are conditionally enabled based on the image domain (real or sim)
+To adapt simulated training to real-world validation, we apply the following domain adaptation in `dataset.py`:
+- **ColorJitter**: Adds random modifications in brightness, contrast and saturation. This tries to replicate varying lighting conditions and different camera calibrations.
+- **GaussianBlur**: Adds an imperfection to the image by applying a blur to mimic motion blur or sensors with low quality. This helps the model to become more robust to noisy inputs.
+- **RandomAffine**: Implements random translation, scaling and rotation to the image. This tries to mimic small variations in the camera pose and vehicle motion.
+- **Perspective transform**: Warps the image using random perspective distortions, emulating changes in camera viewpoint or road slope. This improves the planner’s robustness to unseen road geometries. 
+- **Random Erasing**: Applies random rectangular masks to block the vision to simulate occlusions such as rain, dirt or partially visible objects. This helps the model to rely on the broader context rather than local cues only. 
+
+Additionally, we added 50% of our real validation data in our training dataset to train the model with the real images. Together, these adaptation techniques improve the transfer between simulation and real-world datasets.
 
 ### Results for validation
 
 | Metric       | Value |
 |--------------|--------|
-| ADE (Validation) | ✅ **1.5** |
+| ADE (Validation) | ✅ **1.45** |
 | FDE (Validation) | ~4.26     	|
 
 With this method we could get an ADE score < 1.8 and reach the task of Milestone 3 with the permitted input.
@@ -104,28 +97,28 @@ pip install -r requirements.txt
 ```
 
 ## Data 
-To download and extract the training, validation, and test datasets for the Milestone 1, run the following script:
+To download and extract the training, validation, and test datasets for the Milestone 3, run the following script:
 ```bash
 import gdown
 import zipfile
 
 # Training data
-download_url = "https://drive.google.com/uc?id=1YkGwaxBKNiYL2nq--cB6WMmYGzRmRKVr"
+download_url = f"https://drive.google.com/uc?id=1YkGwaxBKNiYL2nq--cB6WMmYGzRmRKVr"
 output_zip = "dlav_train.zip"
-gdown.download(download_url, output_zip, quiet=False)
-with zipfile.ZipFile(output_zip, 'r') as zip_ref:
+gdown.download(download_url, output_zip, quiet=False)  # Downloads the file to your drive
+with zipfile.ZipFile(output_zip, 'r') as zip_ref:  # Extracts the downloaded zip file
     zip_ref.extractall(".")
 
 # Validation data
-download_url = "https://drive.google.com/uc?id=1wtmT_vH9mMUNOwrNOMFP6WFw6e8rbOdu"
-output_zip = "dlav_val.zip"
+download_url = "https://drive.google.com/uc?id=17DREGym_-v23f_qbkMHr7vJstbuTt0if"
+output_zip = "dlav_val_real.zip"
 gdown.download(download_url, output_zip, quiet=False)
 with zipfile.ZipFile(output_zip, 'r') as zip_ref:
     zip_ref.extractall(".")
 
-# Public test data
-download_url = "https://drive.google.com/uc?id=1G9xGE7s-Ikvvc2-LZTUyuzhWAlNdLTLV"
-output_zip = "dlav_test_public.zip"
+# Testing data
+download_url = "https://drive.google.com/uc?id=1_l6cui0pCJ_caixN0uTkkUOfu6ICO8u5"
+output_zip = "test_public_real.zip"
 gdown.download(download_url, output_zip, quiet=False)
 with zipfile.ZipFile(output_zip, 'r') as zip_ref:
     zip_ref.extractall(".")
@@ -139,11 +132,11 @@ Configuration to run the training:
 
 ```bash
 # --- Configuration ---
-BATCH_SIZE = 16
-NUM_EPOCHS = 200
-LEARNING_RATE = 1e-4
+BATCH_SIZE = 32
+NUM_EPOCHS = 250
+LEARNING_RATE = 1e-3
 WEIGHT_DECAY = 1e-5
-EARLY_STOP_PATIENCE = 25
+EARLY_STOP_PATIENCE = 35
 SAVE_PATH = 'best_model.pth'
 ```
 
