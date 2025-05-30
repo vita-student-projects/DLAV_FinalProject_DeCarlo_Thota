@@ -16,7 +16,7 @@ This project implements an Perception Aware deep learning model for the final pr
 This phase upgrades the Phase-1 and Phase-2 end-to-end trajectory planner by training to perceive the real scenario.
 This repository implements an **end-to-end trajectory planner** designed to generalize from simulation to real-world driving scenarios. Built on top of our Milestone 1 architecture, it focuses on **robust spatial-temporal encoding**, **domain-augmented training**, and **scheduled sampling** to deliver low ADE performance in real-world scenes.
 
-It uses a GRU decoder with Laplace uncertainty modeling and scheduled sampling.
+It uses a GRU decoder with scheduled sampling.
 
 ### Key Features
 
