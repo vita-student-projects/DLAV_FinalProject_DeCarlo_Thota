@@ -64,8 +64,8 @@ Additionally, we added 50% of our real validation data in our training dataset t
 
 | Metric       | Value |
 |--------------|--------|
-| ADE (Validation) | ✅ **1.45** |
-| FDE (Validation) | ~4.26     	|
+| ADE (Validation) | ✅ **1.36** |
+| FDE (Validation) | ~3.93     	|
 
 With this method we could get an ADE score < 1.8 and reach the task of Milestone 3 with the permitted input.
 
