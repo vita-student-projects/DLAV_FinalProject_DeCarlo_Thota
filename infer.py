@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 from models import CASPStylePlanner
 from data import DrivingDataset
 
+
 if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -16,7 +17,7 @@ if __name__ == "__main__":
         [os.path.join(test_data_dir, fn) for fn in os.listdir(test_data_dir) if fn.endswith(".pkl")],
         key=lambda fn: int(os.path.splitext(os.path.basename(fn))[0])
     )
-    test_dataset = DrivingDataset(test_files, test=True)
+    test_dataset = DrivingDataset(test_files, is_real=True, test=True)
     test_loader = DataLoader(test_dataset, batch_size=250, num_workers=2)
 
     # === Load Model ===
@@ -32,7 +33,7 @@ if __name__ == "__main__":
             camera = batch['camera'].to(device)
             history = batch['history'].to(device)
 
-            traj_pred = model(camera, history, command=None)
+            traj_pred = model(camera, history)
             all_plans.append(traj_pred.cpu().numpy()[..., :2])  # x, y only
 
     # === Flatten Results ===
